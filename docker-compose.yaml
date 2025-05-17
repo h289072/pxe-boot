@@ -1,0 +1,52 @@
+# version: '3.8'
+
+# services:
+#   dnsmasq-grub:
+#     build: ./dnsmasq-grub
+#     ports:
+#       - "67:67/udp"
+#       - "69:69/udp"
+#     cap_drop:
+#       - ALL
+#     cap_add:
+#       - NET_RAW
+#       - NET_BIND_SERVICE
+#     restart: unless-stopped
+
+#   lighttpd:
+#     image: docker.io/bitnami/lighttpd:latest
+#     cap_drop:
+#       - ALL
+#     cap_add:
+#       - NET_BIND_SERVICE
+#     ports:
+#       - "80:80"
+#     volumes:
+#       - shared-data:/app
+#     restart: unless-stopped
+
+#   downloader:
+#     image: alpine:latest
+#     entrypoint: /bin/sh
+#     tty: true
+#     volumes:
+#       - ./shared:/data
+#     # NOTE: Add aria2c, jq, etc., if needed
+
+# volumes:
+#   shared-data:
+
+version: '3.9'
+
+services:
+  os-image-processor:
+    build: ./os-image-processor
+    command: tail -f /dev/null
+    volumes:
+      - ./meta.json:/data/meta.json  # Bind mount the meta.json from host to container
+      - unpacked-iso:/data/unpacked-iso
+      - download:/data/download
+
+volumes:
+  unpacked-iso:
+  download:

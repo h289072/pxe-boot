@@ -1,0 +1,116 @@
+{
+    "images": [
+      {
+        "id": "debian-inst",
+        "version": "12.10.0",
+        "check_date": "2025-04-29T20:00:00Z",
+        "source_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso",
+        "verifications": {
+          "sha256": "ee8d8579128977d7dc39d48f43aec5ab06b7f09e1f40a9d98f2a9d149221704a",
+          "sha512": "cb089def0684fd93c9c2fbe45fd16ecc809c949a6fd0c91ee199faefe7d4b82b64658a264a13109d59f1a40ac3080be2f7bd3d8bf3e9cdf509add6d72576a79b"
+        },
+        "boot_info": {
+          "description": "Debian Installer"
+        }
+      },
+      {
+        "id": "debian-live",
+        "version": "12.10.0",
+        "check_date": "2025-04-29T20:00:00Z",
+        "source_url": "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-12.10.0-amd64-cinnamon.iso",
+        "verifications": {
+          "sha256": "62af230ba509af52716caed85eb234d23a541875132a01e24b5a27573191aa0c",
+          "sha512": "bbe4fb73ebf4040779ea60a9bbe158421ece7989478bb1cee33139326b5b6e2f9e337cbf3b418348a227c05351c81da4bf44275a03845a09073c3b284c906f2a"
+        },
+        "boot_info": {
+          "description": "Debian Live"
+        }
+      },
+      {
+        "id": "finnix",
+        "version": "250",
+        "check_date": "2025-04-27T09:37:44Z",
+        "source_url": "https://linode-tokyo.mirrors.finnix.org/pub/mirrors/finnix/releases/current/finnix-250.iso",
+        "verifications": {
+          "sha256": "37920e858f2339f0602ee07624ccf6fc2b38e27c2822c4be367eb118045f367a",
+          "sha512": "7c018bd6982ccfff76768a426ecf77c18a3524e2dfe25a4d7fcaec3f50296bba89a078c70b54b2d1acb30798ebc54ed46615315517c608e64e5f2b1c6e90249a",
+          "ssh": {
+            "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAglATDkQl4v6UdL0OryJTy+BWBTp\nUBv6xWyK1BTy0eXfwAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQyNTUx\nOQAAAEC/DR/7ohVGqAASME4XTQXuRci0eXPaqFtr4RosTIefqkEmtnuPPBex8MsQAc79Fw\nS1+kPo4th7/T1/MDmEZfYP\n-----END SSH SIGNATURE-----",
+            "key": "file-signing@finnix.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQEw5EJeL+lHS9Dq8iU8vgVgU6VAb+sVsitQU8tHl38",
+            "signer_identity": "file-signing@finnix.org"
+          }
+        },
+        "boot_info": {
+          "description": "Finnix Live System",
+          "kernel_path": "/live/vmlinuz",
+          "initrd_path": "/live/initrd.img",
+          "kernel_options": {
+            "fetch": "$BASE_URL/live/filesystem.squashfs",
+            "boot": "live"
+          }
+        }
+      },
+      {
+        "id": "rescatux",
+        "version": "0.74",
+        "check_date": "2025-04-29T20:00:00Z",
+        "source_url": "https://sourceforge.net/projects/rescatux/files/rescatux-0.74/rescatux-0.74.iso/download",
+        "verifications": {
+          "sha256": "d250f38a8174f122b3b6382ed735d161e4b790db2c27783ba03526b4d4d28521"
+        },
+        "boot_info": {
+          "description": "Rescatux Live Linux"
+        }
+      },
+      {
+        "id": "supergrub",
+        "version": "2.06s4",
+        "check_date": "2025-04-29T20:00:00Z",
+        "source_url": "https://sourceforge.net/projects/supergrub2/files/2.06s4/super_grub2_disk_2.06s4/supergrub2-classic-2.06s4-multiarch-CD.iso/download",
+        "verifications": {
+          "sha256": "d26ee9cda990051fbe4c2b367659df5156a130a7ada29f0b4fb0e65928d8ebab"
+        },
+        "boot_info": {
+          "description": "Super Grub2 Disk"
+        }
+      },
+      {
+        "id": "systemrescue",
+        "version": "12.00",
+        "check_date": "2025-04-27T09:37:44Z",
+        "source_url": "https://fastly-cdn.system-rescue.org/releases/12.00/systemrescue-12.00-amd64.iso",
+        "verifications": {
+          "sha256": "11a1f31412046cc28f2b7a465a2f1634ca5095594a9e5937e1ff9fd25f9ae8e6",
+          "sha512": "3a18360ca4156231bf15505895e452554e1913a5518b7808c15cef66ebf12a018af2329e9a3f908e2bce531403268ac1ad6c4cc8f258a79f91e6f0f57f1c78fe",
+          "gpg": {
+            "signature": "-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCAAdFiEEYpiQRutcfphezfXdOw/qm+E8o8kFAmfVQtMACgkQOw/qm+E8\no8m4zw/+N4rKTFiIS2INbhQzGNLM4jcT0QbszznUV7magDZP2Gg4cUdLGPm9BClB\n3AbfWbvzzvghKD2waL6yi9xQg6uweexJP+sUBxQZaKJMmuztyySd38rsmj7RF5pL\nKgrek+Rwj3PMywn9RVmfDc7rcTbEJrfZX12t1dwlZEpLgKYETcdeMlgn/7KHrpzi\nEBWzcXLL2LcQb/Oib+Ho2LqE21KWEs7XijQyQVYtUSldAr8cqhnebKPg1ZFIL7TP\nJsBiVoSTGq4zspSR369k4ir3ldp3RrsXVugiDbwCK04B2CSnot+oUz1NyFQiXs8G\nsmDTcB2Ll+p3K9zln+bHeGkCgJoZdLUztgQwfWbJumIB0YA/kGEHkzMrJ41MnaC7\na/8/fUSV8Z/op12X0iH5HnExv13znhaQr12z99UzFCH7HzXDW0SlTDloKs9yMCsy\ndU6dKzi6Cz+8dLXHnU0/NtoRRRWxXEaVRFWFWHPDoAYLRkf4mnv72Sfrn4WMD/1d\nQcPc3QRr/j1wcmXvArMkbCPYpfbb00A0gH5goiS1C03A4dvTKlmIED32cSG8LlNH\nnwwgx6yQ3pV8rk7YrLmUNUbjPz1bjpVjyrv4Ci5ObkpHj8iDDIKOZqC/dkSKYGrr\ntBFBiKYmydrFGrv1snkzEC+UnreimVwkV7BLsqQeKWfAPsrfyUE=\n=PN+d\n-----END PGP SIGNATURE-----\n",
+            "key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n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\nT6DWXyhAG+PnJH8N\n=3ZAV\n-----END PGP PUBLIC KEY BLOCK-----\n"
+          }
+        },
+        "boot_info": {
+          "description": "SystemRescue Live System",
+          "kernel_path": "/sysresccd/boot/x86_64/vmlinuz",
+          "initrd_path": "/sysresccd/boot/x86_64/sysresccd.img",
+          "kernel_options": {
+            "archisobasedir": "sysresccd",
+            "archisolabel": "boot",
+            "ip": "dhcp",
+            "archiso_http_srv": "$BASE_URL/"
+          }
+        }
+      },
+      {
+        "id": "ubuntu-desktop",
+        "version": "24.04.2",
+        "check_date": "2025-04-29T20:00:00Z",
+        "source_url": "https://releases.ubuntu.com/noble/ubuntu-24.04.2-desktop-amd64.iso",
+        "verifications": {
+          "sha256": "d7fe3d6a0419667d2f8eff12796996328daa2d4f90cd9f87aa9371b362f987bf"
+        },
+        "boot_info": {
+          "description": "Ubuntu Desktop"
+        }
+      }
+    ]
+  }
+  
