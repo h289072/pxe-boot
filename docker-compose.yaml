@@ -2,7 +2,8 @@ services:
 
   os-image-processor:
     build: ./os-image-processor
-    #command: tail -f /dev/null
+    user: "65532:10000"
+    # command: tail -f /dev/null
     cap_drop:
       - ALL
     volumes:
@@ -16,6 +17,7 @@ services:
   dnsmasq:
     build: ./dnsmasq
     network_mode: host
+    user: "100:10000"
     # command: tail -f /dev/null
     cap_drop:
       - ALL
@@ -26,7 +28,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./meta.json:/data/meta.json:ro  # Bind mount the meta.json from host to container
-      - unpacked-iso:/data/unpacked-iso:ro
+      - unpacked-iso:/data/unpacked-iso:rw
     environment:
       METADATA_FILE: /data/meta.json
       UNPACKED_ISO_DIR: /data/unpacked-iso
@@ -34,6 +36,7 @@ services:
   lighttp:
     build: ./lighttp
     network_mode: host
+    user: "100:10000"
     # command: tail -f /dev/null
     cap_drop:
       - ALL

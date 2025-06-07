@@ -31,7 +31,7 @@ METADATA_FILE="${METADATA_FILE:-${METADATA_FILE_DEFAULT}}"
 UNPACKED_ISO_DIR="${UNPACKED_ISO_DIR:-${UNPACKED_ISO_DIR_DEFAULT}}"
 IFACE="${IFACE:-${IFACE_DEFAULT}}"
 
-GRUB_CONFIG="${TFTP_DIR}/grub.cfg"
+IPXE_CONFIG="${UNPACKED_ISO_DIR}/boot.ipxe"
 
 # Alle CIDRs für das Interface sammeln (eine pro Zeile)
 IP_CIDRS=$(ip -o -f inet addr show "$IFACE" | awk '{print $4}')
@@ -71,37 +71,31 @@ port=0
 dhcp-range=$NETWORK,proxy,$NETMASK
 enable-tftp
 tftp-root=$TFTP_DIR
-pxe-service=tag:efi-x86_64,x86-64_EFI,"Network Boot",grubx64.efi
+
+# PXE boot for UEFI x86_64
 dhcp-match=set:efi-x86_64,option:client-arch,7
+
+# PXE für UEFI x86_64 Client
+pxe-service=tag:!ipxe,X86-64_EFI,"PXE Boot",ipxe.efi
+
+# Optional: iPXE-Erkennung → HTTP
+dhcp-userclass=set:ipxe,iPXE
+dhcp-boot=tag:ipxe,http://${IP}:8080/boot.ipxe
+
 dhcp-leasefile=/var/lib/dnsmasq/dnsmasq.leases
 log-facility=-
 log-queries
 log-dhcp
 EOF
 
-# Generate GRUB bootloader
-grub-mkimage -p "(tftp,$IP)" -O x86_64-efi -o "${TFTP_DIR}/grubx64.efi" \
-	tftp http net linux normal configfile efinet echo
-
-# Start the GRUB configuration file
-cat <<EOF > "$GRUB_CONFIG"
-# Auto-generated GRUB configuration
-
-set default=0
-set timeout=5
-
-menuentry "Boot from local disk" {
-    set root=(hd0)
-    chainloader +1
-    boot
-}
-
-EOF
-
-# Iterate over each image in the JSON file
-jq -c '.images[]' "$METADATA_FILE" | while read -r image; do
+IPXE_MENU=""
+IPXE_TARGETS=""
+# Iterate over each image in the JSON file to assemble iPXE config
+while IFS= read -r image; do
     # Extract image ID
     ID=$(printf "%s" "$image" | jq -r '.id')
+
+    echo "Processing image $ID"
 
     # Extract boot information
     KERNEL_PATH=$(printf "%s" "$image" | jq -r '.boot_info.kernel_path')
@@ -111,31 +105,52 @@ jq -c '.images[]' "$METADATA_FILE" | while read -r image; do
     FULL_KERNEL_PATH="/${ID}${KERNEL_PATH}"
     FULL_INITRD_PATH="/${ID}${INITRD_PATH}"
 
-    if [ -f "$UNPACKED_ISO_DIR/$FULL_KERNEL_PATH" ] && [ -f "$UNPACKED_ISO_DIR/$FULL_INITRD_PATH" ]; then
+    echo "Kernel path: ${UNPACKED_ISO_DIR}${FULL_KERNEL_PATH}"
+    echo "Initrd path: ${UNPACKED_ISO_DIR}${FULL_INITRD_PATH}"
+
+    if [ -f "${UNPACKED_ISO_DIR}${FULL_KERNEL_PATH}" ] && [ -f "${UNPACKED_ISO_DIR}${FULL_INITRD_PATH}" ]; then
         # Extract kernel options and construct the options string
         KERNEL_OPTIONS=$(printf "%s" "$image" | jq -r '
         .boot_info.kernel_options? // [] | .[]' | paste -sd ' ' -)
 
         DESCRIPTION=$(printf "%s" "$image" | jq -r '.boot_info.description')
 
+        echo "Kernel files found, registering $DESCRIPTION"
+
         # Replace $IP placeholder in kernel options
         OS_URL="http://${IP}:8080/${ID}"
         KERNEL_OPTIONS=${KERNEL_OPTIONS//\$BASE_URL/$OS_URL}
 
-        # Append the menu entry to the GRUB configuration file
-        cat <<EOF >> "$GRUB_CONFIG"
-menuentry "$DESCRIPTION via network boot" {
-    set root=(http,$IP:8080)
-    linux $FULL_KERNEL_PATH $KERNEL_OPTIONS
-    initrd $FULL_INITRD_PATH
-    boot
-}
+        # Assemble iPXE menu entries
+        IPXE_MENU="$(printf "%s\nitem %s %s" "$IPXE_MENU" "$ID" "$DESCRIPTION")"
+
+        # Assemble iPXE targets
+        IPXE_TARGETS="$(printf "%s\n:%s\nkernel http://%s:8080%s %s\ninitrd http://%s:8080%s\nboot\n\n\n" \
+          "$IPXE_TARGETS" "$ID" "$IP" "$FULL_KERNEL_PATH" "$KERNEL_OPTIONS" "$IP" "$FULL_INITRD_PATH")"
+    fi
+done <<EOF
+$(jq -c '.images[]' "$METADATA_FILE")
 EOF
 
 
-        echo "" >> "$GRUB_CONFIG"
-    fi
-done
+# This file will be used be hosted by lighttpd
+cat <<EOF > "$IPXE_CONFIG"
+#!ipxe
+
+# Auto-generated iPXE configuration
+
+menu iPXE Boot Menu
+item local Boot from local disk
+item shell iPXE Shell$IPXE_MENU
+choose --default local --timeout 5000 target && goto \${target}
+
+:local
+exit
+
+:shell
+shell
+$IPXE_TARGETS
+EOF
 
 echo "[INFO] Starting dnsmasq with:"
 echo "$@"

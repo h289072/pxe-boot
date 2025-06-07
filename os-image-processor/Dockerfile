@@ -57,9 +57,11 @@ RUN apk add --no-cache \
 VOLUME /data/unpacked-iso
 VOLUME /data/download
 
-RUN adduser -D -u 65532 nonroot && \
+RUN addgroup -g 10000 pxeboot && \
+    adduser -D -u 65532 -G pxeboot nonroot && \
     mkdir -p /data/unpacked-iso /data/download && \
-    chown -R nonroot:nonroot /data
+    chown -R nonroot:pxeboot /data && \
+    chmod -R g+w /data
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /home/nonroot/dist/download_all /usr/local/bin/download_all

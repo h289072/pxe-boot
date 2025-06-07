@@ -7,7 +7,11 @@ VOLUME /data/unpacked-iso
 COPY entrypoint.sh /entrypoint.sh
 
 # Install lighttpd (klein, effizienter Webserver)
-RUN apk add --no-cache lighttpd && \ 
+RUN apk add --no-cache \
+        lighttpd \
+        shadow && \
+    addgroup -g 10000 pxeboot && \
+    usermod -aG pxeboot lighttpd && \
     mkdir -p "$UNPACKED_ISO_DIR" && \
     chown -R lighttpd:lighttpd "$UNPACKED_ISO_DIR" /etc/lighttpd && \
     chmod +x /entrypoint.sh

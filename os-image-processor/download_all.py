@@ -295,6 +295,7 @@ async def main_async(
     image_dir.mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
     dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_dir.chmod(0o775)
 
     loop = asyncio.get_running_loop()
 
