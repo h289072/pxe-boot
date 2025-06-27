@@ -2,8 +2,10 @@ FROM alpine:latest
 
 ENV METADATA_FILE=/data/meta.json
 ENV UNPACKED_ISO_DIR=/data/unpacked-iso
+ENV SHARED_CONFIG_DIR=/data/config
 
 VOLUME /data/unpacked-iso
+VOLUME /data/config
 
 COPY entrypoint.sh /entrypoint.sh
 
@@ -17,12 +19,12 @@ RUN apk add --no-cache \
     addgroup -g 10000 pxeboot && \
     usermod -aG pxeboot dnsmasq && \
     /usr/sbin/setcap 'cap_net_admin,cap_net_raw,cap_net_bind_service=+ep' /usr/sbin/dnsmasq && \
-    mkdir -p /var/lib/tftpboot /etc/dnsmasq.d /var/lib/dnsmasq /data/unpacked-iso && \
+    mkdir -p /var/lib/tftpboot /etc/dnsmasq.d /var/lib/dnsmasq ${UNPACKED_ISO_DIR} ${SHARED_CONFIG_DIR} && \
     wget https://boot.ipxe.org/ipxe.efi -O /var/lib/tftpboot/ipxe.efi && \
     chown -R dnsmasq:dnsmasq /var/lib/tftpboot /etc/dnsmasq.d /var/lib/dnsmasq && \
     chmod +x /entrypoint.sh && \
-    chgrp -R pxeboot /data/unpacked-iso && \
-    chmod -R g+w /data/unpacked-iso
+    chown -R dnsmasq:pxeboot ${SHARED_CONFIG_DIR} && \
+    chgrp -R pxeboot ${UNPACKED_ISO_DIR}
 
 HEALTHCHECK --interval=30s --timeout=5s CMD pgrep dnsmasq || exit 1
 

@@ -44,6 +44,8 @@ FROM alpine:latest
 
 ENV METADATA_FILE=/data/meta.json
 ENV UNPACKED_ISO_DIR=/data/unpacked-iso
+ENV IMAGE_DIR=/data/images
+ENV WORK_DIR=/data/work
 
 # Install only runtime libs needed for the binary
 RUN apk add --no-cache \
@@ -55,13 +57,15 @@ RUN apk add --no-cache \
 
 # Create required mountpoints and user
 VOLUME /data/unpacked-iso
-VOLUME /data/download
+VOLUME /data/images
+VOLUME /data/work
 
 RUN addgroup -g 10000 pxeboot && \
     adduser -D -u 65532 -G pxeboot nonroot && \
-    mkdir -p /data/unpacked-iso /data/download && \
-    chown -R nonroot:pxeboot /data && \
-    chmod -R g+w /data
+    mkdir -p ${UNPACKED_ISO_DIR} ${IMAGE_DIR} ${WORK_DIR} && \
+    chown -R nonroot:pxeboot ${UNPACKED_ISO_DIR} ${IMAGE_DIR} ${WORK_DIR}
+    # && \
+    # chmod -R g+w ${UNPACKED_ISO_DIR} ${IMAGE_DIR} ${WORK_DIR}
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /home/nonroot/dist/download_all /usr/local/bin/download_all

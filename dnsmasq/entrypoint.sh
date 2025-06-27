@@ -7,6 +7,7 @@ TFTP_DIR_DEFAULT="/var/lib/tftpboot"
 DNSMASQ_CONF_DEFAULT="/etc/dnsmasq.d/pxe.conf"
 METADATA_FILE_DEFAULT="/data/meta.json"
 UNPACKED_ISO_DIR_DEFAULT="/data/unpacked-iso"
+SHARED_CONFIG_DIR_DEFAULT="/data/config"
 
 # Netzwerkdaten ermitteln
 IFACE_DEFAULT=$(ip route get 8.8.8.8 | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
@@ -29,9 +30,10 @@ TFTP_DIR="${TFTP_DIR:-${TFTP_DIR_DEFAULT}}"
 DNSMASQ_CONF="${DNSMASQ_CONF:-${DNSMASQ_CONF_DEFAULT}}"
 METADATA_FILE="${METADATA_FILE:-${METADATA_FILE_DEFAULT}}"
 UNPACKED_ISO_DIR="${UNPACKED_ISO_DIR:-${UNPACKED_ISO_DIR_DEFAULT}}"
+SHARED_CONFIG_DIR="${SHARED_CONFIG_DIR:-${SHARED_CONFIG_DIR_DEFAULT}}"
 IFACE="${IFACE:-${IFACE_DEFAULT}}"
 
-IPXE_CONFIG="${UNPACKED_ISO_DIR}/boot.ipxe"
+IPXE_CONFIG="${SHARED_CONFIG_DIR}/boot.ipxe"
 
 # Alle CIDRs für das Interface sammeln (eine pro Zeile)
 IP_CIDRS=$(ip -o -f inet addr show "$IFACE" | awk '{print $4}')
@@ -80,7 +82,7 @@ pxe-service=tag:!ipxe,X86-64_EFI,"PXE Boot",ipxe.efi
 
 # Optional: iPXE-Erkennung → HTTP
 dhcp-userclass=set:ipxe,iPXE
-dhcp-boot=tag:ipxe,http://${IP}:8080/boot.ipxe
+dhcp-boot=tag:ipxe,http://${IP}:8080/config/boot.ipxe
 
 dhcp-leasefile=/var/lib/dnsmasq/dnsmasq.leases
 log-facility=-
@@ -102,13 +104,13 @@ while IFS= read -r image; do
     INITRD_PATH=$(printf "%s" "$image" | jq -r '.boot_info.initrd_path')
 
     # Construct full paths for kernel and initrd
-    FULL_KERNEL_PATH="/${ID}${KERNEL_PATH}"
-    FULL_INITRD_PATH="/${ID}${INITRD_PATH}"
+    FULL_KERNEL_PATH="${ID}${KERNEL_PATH}"
+    FULL_INITRD_PATH="${ID}${INITRD_PATH}"
 
-    echo "Kernel path: ${UNPACKED_ISO_DIR}${FULL_KERNEL_PATH}"
-    echo "Initrd path: ${UNPACKED_ISO_DIR}${FULL_INITRD_PATH}"
+    echo "Kernel path: ${UNPACKED_ISO_DIR%/}/${FULL_KERNEL_PATH}"
+    echo "Initrd path: ${UNPACKED_ISO_DIR%/}/${FULL_INITRD_PATH}"
 
-    if [ -f "${UNPACKED_ISO_DIR}${FULL_KERNEL_PATH}" ] && [ -f "${UNPACKED_ISO_DIR}${FULL_INITRD_PATH}" ]; then
+    if [ -f "${UNPACKED_ISO_DIR%/}/${FULL_KERNEL_PATH}" ] && [ -f "${UNPACKED_ISO_DIR%/}/${FULL_INITRD_PATH}" ]; then
         # Extract kernel options and construct the options string
         KERNEL_OPTIONS=$(printf "%s" "$image" | jq -r '
         .boot_info.kernel_options? // [] | .[]' | paste -sd ' ' -)
@@ -118,15 +120,19 @@ while IFS= read -r image; do
         echo "Kernel files found, registering $DESCRIPTION"
 
         # Replace $IP placeholder in kernel options
-        OS_URL="http://${IP}:8080/${ID}"
-        KERNEL_OPTIONS=${KERNEL_OPTIONS//\$BASE_URL/$OS_URL}
+        UNPACKED_ISO_URL="http://${IP}:8080/unpacked-iso/${ID}"
+        KERNEL_OPTIONS=${KERNEL_OPTIONS//\$UNPACKED_ISO_URL/$UNPACKED_ISO_URL}
+        IMAGE_URL="http://${IP}:8080/images"
+        KERNEL_OPTIONS=${KERNEL_OPTIONS//\$IMAGE_URL/$IMAGE_URL}
 
         # Assemble iPXE menu entries
         IPXE_MENU="$(printf "%s\nitem %s %s" "$IPXE_MENU" "$ID" "$DESCRIPTION")"
 
         # Assemble iPXE targets
-        IPXE_TARGETS="$(printf "%s\n:%s\nkernel http://%s:8080%s %s\ninitrd http://%s:8080%s\nboot\n\n\n" \
-          "$IPXE_TARGETS" "$ID" "$IP" "$FULL_KERNEL_PATH" "$KERNEL_OPTIONS" "$IP" "$FULL_INITRD_PATH")"
+        # IPXE_TARGETS="$(printf "%s\n:%s\nkernel http://%s:8080%s %s\ninitrd http://%s:8080%s\nboot\n\n\n" \
+        #   "$IPXE_TARGETS" "$ID" "$IP" "$FULL_KERNEL_PATH" "$KERNEL_OPTIONS" "$IP" "$FULL_INITRD_PATH")"
+        IPXE_TARGETS="$(printf "%s\n:%s\nkernel %s%s %s\ninitrd %s%s\nboot\n\n\n" \
+          "$IPXE_TARGETS" "$ID" "$UNPACKED_ISO_URL" "$KERNEL_PATH" "$KERNEL_OPTIONS" "$UNPACKED_ISO_URL" "$INITRD_PATH")"
     fi
 done <<EOF
 $(jq -c '.images[]' "$METADATA_FILE")

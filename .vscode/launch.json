@@ -11,16 +11,6 @@
             "program": "${workspaceFolder}/os-image-processor/download_all.py",
             "console": "integratedTerminal",
             "args": "${command:pickArgs}"
-        },
-        {
-            "type": "bashdb",
-            "request": "launch",
-            "name": "Bash-Debug dowload_all.sh",
-            "cwd": "${workspaceFolder}",
-            "program": "${workspaceFolder}/os-image-processor/download_all.sh",
-            "args": [
-                "meta.json"
-            ]
         }
     ]
 }

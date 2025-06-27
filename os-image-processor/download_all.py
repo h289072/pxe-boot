@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import json
+import re
 import hashlib
 import os
 import pathlib
+import stat
+import urllib.parse
 import subprocess
 import shutil
 import logging
@@ -12,7 +15,7 @@ import aiofiles
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 from pypdl import Pypdl
 
 # --- Configuration ---
@@ -177,6 +180,34 @@ def is_verified(
             return False
     return True
 
+def make_writable_recursive(path: str):
+    """
+    Fügt rekursiv Schreibrechte für alle Dateien und Ordner unterhalb von `path` hinzu.
+    """
+    for root, dirs, files in os.walk(path, topdown=False):
+        for name in files:
+            file_path = os.path.join(root, name)
+            try:
+                mode = os.stat(file_path).st_mode
+                os.chmod(file_path, mode | stat.S_IWUSR)
+            except Exception as e:
+                print(f"Fehler bei chmod (Datei): {file_path} → {e}")
+
+        for name in dirs:
+            dir_path = os.path.join(root, name)
+            try:
+                mode = os.stat(dir_path).st_mode
+                os.chmod(dir_path, mode | stat.S_IWUSR | stat.S_IXUSR)
+            except Exception as e:
+                print(f"Fehler bei chmod (Ordner): {dir_path} → {e}")
+
+    # Und auch das Wurzelverzeichnis selbst
+    try:
+        mode = os.stat(path).st_mode
+        os.chmod(path, mode | stat.S_IWUSR | stat.S_IXUSR)
+    except Exception as e:
+        print(f"Fehler bei chmod (Root-Verzeichnis): {path} → {e}")
+
 # --- Extraction ---
 def extract_iso(iso_path: Path, dest_dir: Path, logger: logging.Logger) -> None:
     """
@@ -186,15 +217,51 @@ def extract_iso(iso_path: Path, dest_dir: Path, logger: logging.Logger) -> None:
         iso_path (Path): The path to the ISO file to extract.
         dest_dir (Path): The path to the directory where the ISO file should be extracted.
     """
+
+    if os.path.exists(dest_dir):
+        logger.info(f"Removing {dest_dir}, before re-extracting")
+        make_writable_recursive(dest_dir)
+        shutil.rmtree(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     try:
+        logger.info(f"Extracting {iso_path} to {dest_dir}")
         subprocess.run(["bsdtar", "-xf", str(iso_path), "-C", str(dest_dir)], check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"GPG verification error: {e.stderr.decode()}")
+        logger.error(f"Extraction error: {e.stderr.decode()}")
+
+
+def get_extension(url: str) -> str:
+    # URL parsen → nur den Pfad nehmen
+    path = urllib.parse.urlparse(url).path
+    
+    # In Teile splitten → von hinten nach vorn das erste Element mit einem Punkt nehmen
+    parts = path.split('/')
+    for part in reversed(parts):
+        if '.' in part:
+            filename = part
+            break
+    else:
+        return ''  # keine passende Datei gefunden
+
+    # Entferne Zwischenpunkte zwischen Zahlen (z. B. "12.11.0" wird zu "12_11_0")
+    cleaned = re.sub(r'(?<=\d)\.(?=\d)', '_', filename)
+    
+    # Jetzt auf letzte zwei echte Endungen prüfen
+    parts = cleaned.split('.')
+    
+    if len(parts) >= 3:
+        return '.' + parts[-2] + '.' + parts[-1]  # z. B. tar.gz
+    elif len(parts) >= 2:
+        return '.' + parts[-1]  # z. B. .gz
+    else:
+        return ''  # keine Endung gefunden
 
 # --- Processing task ---
-def process_image(
-    img: Dict[str, Union[str, Dict[str, str]]],
+# def process_image(
+    # img: Dict[str, Union[str, Dict[str, str]]],
+def process_source(
+    src: Dict[str, Union[str, Dict[str, str]]],
+    img_id: str,
     segments: int,
     retries: int,
     work_dir: Path,
@@ -218,56 +285,59 @@ def process_image(
         None
     """
 
-    img_id = img["id"]
-    url = img["source_url"]
-    work_path = work_dir / f"{img_id}.iso"
-    final_path = image_dir / f"{img_id}.iso"
+    id = img_id + '-' + src["id"] if "id" in src else img_id
+    url = src["url"]
+    extension = get_extension(url)
+    work_path = work_dir / f"{id}{extension}"
+    final_path = image_dir / f"{id}{extension}"
     out_dir = dest_dir / img_id
 
-    if is_verified(final_path, img, logger=logger):
-        logger.info(f"Already verified: {img_id} -> {final_path}")
-        return
+    try: 
+        if is_verified(final_path, src.get("verifications"), logger=logger):
+            logger.info(f"Already verified: {id} -> {final_path}")
+            return
 
-    logger.info(f"Downloading: {img_id} from {url}")
+        logger.info(f"Downloading: {work_path} from {url}")
 
-    try:
-        downloader = Pypdl(logger=logger)
-        downloader.start(
-            url=url,
-            file_path=str(work_path),
-            overwrite=True,
-            block=True,
-            retries=retries,
-            segments=segments,
-            display=False)
-    except Exception as e:
-        logger.error(f"Download failed: {img_id}: {e}")
-        return
+        try:
+            downloader = Pypdl(logger=logger)
+            downloader.start(
+                url=url,
+                file_path=str(work_path),
+                overwrite=True,
+                block=True,
+                retries=retries,
+                segments=segments,
+                display=False)
+        except Exception as e:
+            logger.error(f"Download failed: {work_path}: {e}")
+            return
 
-    if not is_verified(work_path, img, logger=logger):
-        logger.error(f"Verification failed: {img_id}")
-        return
+        if not is_verified(work_path, src.get("verifications"), logger=logger):
+            logger.error(f"Verification failed: {work_path}")
+            return
 
-    final_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(work_path, final_path)
-    logger.info(f"Moved to image_dir: {final_path}")
-
-    try:
-        extract_iso(final_path, out_dir, logger)
-        logger.info(f"Extracted {img_id} to {out_dir}")
-    except subprocess.CalledProcessError:
-        logger.error(f"Extraction failed for {img_id}")
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(work_path, final_path)
+        logger.info(f"Moved to image_dir: {final_path}")
+    finally:
+        if final_path.exists() and src.get("unpack", True):
+            try:
+                extract_iso(final_path, out_dir, logger)
+                logger.info(f"Extracted {final_path} to {out_dir}")
+            except subprocess.CalledProcessError:
+                logger.error(f"Extraction failed for {final_path}")
 
 # --- Main logic ---
 async def main_async(
-    metadata_file: str,
+    metadata_file: Path,
     max_jobs: int,
     segments: int,
     retries: int,
-    image_dir: Optional[str] = None,
-    work_dir: Optional[str] = None,
-    dest_dir: Optional[str] = None,
-    log_file: Optional[str] = None,
+    image_dir: Path,
+    work_dir: Path,
+    dest_dir: Path,
+    log_file: Optional[Path] = None,
 ) -> None:
     """
     Download and verify ISO images in parallel.
@@ -287,11 +357,6 @@ async def main_async(
     async with aiofiles.open(metadata_file) as f:
         meta: Any = json.loads(await f.read())
 
-    base_dir = pathlib.Path(metadata_file).parent
-    image_dir = pathlib.Path(image_dir or base_dir / "download/images")
-    work_dir = pathlib.Path(work_dir or base_dir / "download/work")
-    dest_dir = pathlib.Path(dest_dir or base_dir / "unpacked-iso")
-
     image_dir.mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -300,8 +365,8 @@ async def main_async(
     loop = asyncio.get_running_loop()
 
     with ThreadPoolExecutor(max_workers=max_jobs) as executor:
-        tasks = [loop.run_in_executor(executor, process_image, img, segments, retries, work_dir, image_dir, dest_dir, logger)
-                 for img in meta["images"]]
+        tasks = [loop.run_in_executor(executor, process_source, src, img["id"], segments, retries, work_dir, image_dir, dest_dir, logger)
+                 for img in meta["images"] for src in img["source"] ]
         await asyncio.gather(*tasks)
 
 
@@ -309,10 +374,10 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Download and verify ISO images")
-    parser.add_argument("-m", "--metadata", type=Path, help="Path to metadata JSON file")
-    parser.add_argument("-i", "--image-dir",type=Path, help="Directory to store the downloaded image files")
-    parser.add_argument("-w", "--work-dir", type=Path, help="Directory to store the temporary/downloading files")
-    parser.add_argument("-d", "--dest-dir", type=Path, help="Directory to store the extracted extracted ISO files")
+    parser.add_argument("metadata", type=Path, nargs='?', help="Path to metadata JSON file, may alternatively be specfified using the env var METADATA_FILE")
+    parser.add_argument("-i", "--image-dir",type=Path, help="Directory to store the downloaded image files, may alternatively be specified using the env var IMAGE_DIR. Defaults to dirname(metadata)/images")
+    parser.add_argument("-w", "--work-dir", type=Path, help="Directory to store the temporary/downloading files, may alternatively be specfied using the env var WORK_DIR. Defaults to dirname(metadata)/work")
+    parser.add_argument("-d", "--dest-dir", type=Path, help="Directory to store the extracted extracted ISO files, may alternatively be specified using the env var UNPACKED_ISO_DIR. Defaults to dirname(metdata)/unpacked-iso")
     parser.add_argument("-l", "--log-file", type=Path, help="File to write the logs to. Use stdout if not specified")
     parser.add_argument("-j", "--jobs", type=int, default=DEFAULT_CONCURRENT_DOWNLOADS)
     parser.add_argument("-s", "--segments", type=int, default=DEFAULT_DOWNLOAD_SEGMENTS)
@@ -320,13 +385,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    metadata_file = args.metadata or os.environ.get("METADATA_FILE") or "/data/meta.json"
-    dest_dir = args.dest_dir or os.environ.get("UNPACKED_ISO_DIR") or "/data/unpacked-iso"
+    metadata_file = args.metadata or Path(os.environ.get("METADATA_FILE"))
+    dest_dir = args.dest_dir or Path(os.environ.get("UNPACKED_ISO_DIR")) or (metadata_file.parent / "unpacked-iso")
+    image_dir = args.image_dir or Path(os.environ.get("IMAGE_DIR")) or (metadata_file.parent / "images")
+    work_dir = args.work_dir or Path(os.environ.get("WORK_DIR")) or (metadata_file.parent / "work")
 
     asyncio.run(main_async(
         metadata_file=metadata_file,
-        image_dir=args.image_dir,
-        work_dir=args.work_dir,
+        image_dir=image_dir,
+        work_dir=work_dir,
         dest_dir=dest_dir,
         max_jobs=args.jobs,
         segments=args.segments,

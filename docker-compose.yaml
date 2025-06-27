@@ -9,7 +9,8 @@ services:
     volumes:
       - ./meta.json:/data/meta.json  # Bind mount the meta.json from host to container
       - unpacked-iso:/data/unpacked-iso
-      - download:/data/download
+      - work:/data/work
+      - images:/data/images
     environment:
       METADATA_FILE: /data/meta.json
       UNPACKED_ISO_DIR: /data/unpacked-iso
@@ -28,7 +29,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./meta.json:/data/meta.json:ro  # Bind mount the meta.json from host to container
-      - unpacked-iso:/data/unpacked-iso:rw
+      - unpacked-iso:/data/unpacked-iso:ro
+      - shared_config:/data/config:rw
     environment:
       METADATA_FILE: /data/meta.json
       UNPACKED_ISO_DIR: /data/unpacked-iso
@@ -45,11 +47,17 @@ services:
     restart: unless-stopped
     volumes:
       - unpacked-iso:/data/unpacked-iso:ro
+      - images:/data/images:ro
+      - shared_config:/data/config:ro
     environment:
+      WWW_DIR: /data
       UNPACKED_ISO_DIR: /data/unpacked-iso
+      IMAGE_DIR: /data/images
     tmpfs:
       - /tmp
 
 volumes:
   unpacked-iso:
-  download:
+  work:
+  images:
+  shared_config:

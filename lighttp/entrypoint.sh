@@ -5,7 +5,7 @@ set -eu
 # Defaults (werden ggf. überschrieben)
 LIGHTTP_CONF_DEFAULT="/etc/lighttpd/lighttpd.conf"
 METADATA_FILE_DEFAULT="/data/meta.json"
-UNPACKED_ISO_DIR_DEFAULT="/data/unpacked-iso"
+WWW_DIR_DEFAULT="/data"
 
 # Netzwerkdaten ermitteln
 IFACE_DEFAULT=$(ip route get 8.8.8.8 | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
@@ -13,7 +13,7 @@ IFACE_DEFAULT=$(ip route get 8.8.8.8 | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="de
 # Konfigurierbare Variablen, per CLI oder ENV
 for arg in "$@"; do
   case "$arg" in
-    LIGHTTP_CONF=*|METADATA_FILE=*|UNPACKED_ISO_DIR=*|IFACE=*|IP=*)
+    LIGHTTP_CONF=*|METADATA_FILE=*|WWW_DIR=*|IFACE=*|IP=*)
       eval "$arg"
       ;;
     *)
@@ -26,7 +26,7 @@ done
 # Werte mit Priorität: CLI > ENV > Default
 LIGHTTP_CONF="${LIGHTTP_CONF:-${LIGHTTP_CONF_DEFAULT}}"
 METADATA_FILE="${METADATA_FILE:-${METADATA_FILE_DEFAULT}}"
-UNPACKED_ISO_DIR="${UNPACKED_ISO_DIR:-${UNPACKED_ISO_DIR_DEFAULT}}"
+WWW_DIR="${WWW_DIR:-${WWW_DIR_DEFAULT}}"
 IFACE="${IFACE:-${IFACE_DEFAULT}}"
 
 # Alle CIDRs für das Interface sammeln (eine pro Zeile)
@@ -37,8 +37,8 @@ if [ -z "${IP:-}" ]; then
   IP=$(printf "%s\n" "$IP_CIDRS" | head -n1 | cut -d/ -f1)
 fi
 
-cat > "$LIGHTTP_CONF_DEFAULT" <<EOF
-server.document-root = "${UNPACKED_ISO_DIR}"
+cat > "$LIGHTTP_CONF" <<EOF
+server.document-root = "${WWW_DIR}"
 server.bind = "${IP}"
 server.port = 8080
 server.username = "lighttpd"

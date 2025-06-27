@@ -1,8 +1,14 @@
 FROM alpine:latest
 
 # Create default directory (can be overridden at runtime)
+ENV WWW_DIR=/data
 ENV UNPACKED_ISO_DIR=/data/unpacked-iso
+ENV IMAGE_DIR=/data/images
+ENV SHARED_CONFIG_DIR=/data/config
+
 VOLUME /data/unpacked-iso
+VOLUME /data/images
+VOLUME /data/config
 
 COPY entrypoint.sh /entrypoint.sh
 
@@ -12,8 +18,10 @@ RUN apk add --no-cache \
         shadow && \
     addgroup -g 10000 pxeboot && \
     usermod -aG pxeboot lighttpd && \
-    mkdir -p "$UNPACKED_ISO_DIR" && \
-    chown -R lighttpd:lighttpd "$UNPACKED_ISO_DIR" /etc/lighttpd && \
+    mkdir -p "$WWW_DIR" "$UNPACKED_ISO_DIR" "$IMAGE_DIR" "$SHARED_CONFIG_DIR" && \
+    chown -R lighttpd:lighttpd /etc/lighttpd && \
+    chown lighttpd:lighttpd "$WWW_DIR" && \
+    chgrp -R pxeboot ${UNPACKED_ISO_DIR} ${IMAGE_DIR} ${SHARED_CONFIG_DIR} && \
     chmod +x /entrypoint.sh
 
 # Switch to non-root user
